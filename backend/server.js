@@ -8,19 +8,26 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet());
+// Security middleware - disabled helmet temporarily for debugging
+// app.use(helmet());
+
+// CORS configuration for development
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-production-domain.com'] 
-    : ['http://localhost:3000'],
-  credentials: true
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://0.0.0.0:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 
-// Rate limiting
+// Rate limiting - more permissive for development
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // limit each IP to 1000 requests per minute (very permissive for development)
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use('/api/', limiter);
 
@@ -32,6 +39,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan('combined'));
 
 // Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/truck-sessions', require('./routes/truckSessions'));
 app.use('/api/companies', require('./routes/companies'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/trucks', require('./routes/trucks'));
@@ -39,6 +48,7 @@ app.use('/api/routes', require('./routes/routes'));
 app.use('/api/sales', require('./routes/sales'));
 app.use('/api/inventory', require('./routes/inventory'));
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/import', require('./routes/dataImport'));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

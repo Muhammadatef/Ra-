@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -35,12 +35,6 @@ function Sales() {
   const [selectedTruck, setSelectedTruck] = useState('');
   const limit = 20;
 
-  useEffect(() => {
-    fetchSales();
-    fetchTrucks();
-    fetchSalesSummary();
-  }, [page, selectedTruck]);
-
   const fetchTrucks = async () => {
     try {
       const response = await apiEndpoints.getTrucks();
@@ -50,7 +44,7 @@ function Sales() {
     }
   };
 
-  const fetchSales = async () => {
+  const fetchSales = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -70,9 +64,9 @@ function Sales() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, selectedTruck, limit]);
 
-  const fetchSalesSummary = async () => {
+  const fetchSalesSummary = useCallback(async () => {
     try {
       const params = {};
       if (selectedTruck) params.truck_id = selectedTruck;
@@ -82,7 +76,13 @@ function Sales() {
     } catch (err) {
       console.error('Error fetching sales summary:', err);
     }
-  };
+  }, [selectedTruck]);
+
+  useEffect(() => {
+    fetchSales();
+    fetchTrucks();
+    fetchSalesSummary();
+  }, [page, fetchSales, fetchSalesSummary]);
 
   const handlePageChange = (event, newPage) => {
     setPage(newPage);

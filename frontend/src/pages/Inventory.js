@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -31,11 +31,6 @@ function Inventory() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [showLowStock, setShowLowStock] = useState(false);
 
-  useEffect(() => {
-    fetchInventory();
-    fetchTrucks();
-  }, [selectedTruck, selectedCategory, showLowStock]);
-
   const fetchTrucks = async () => {
     try {
       const response = await apiEndpoints.getTrucks();
@@ -45,7 +40,7 @@ function Inventory() {
     }
   };
 
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     try {
       setLoading(true);
       const params = {};
@@ -63,7 +58,12 @@ function Inventory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTruck, selectedCategory, showLowStock]);
+
+  useEffect(() => {
+    fetchInventory();
+    fetchTrucks();
+  }, [fetchInventory]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {

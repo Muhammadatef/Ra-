@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 
-// Get all inventory items
-router.get('/', async (req, res) => {
+// Get all inventory items (only for authenticated user's company)
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const { truck_id, category, low_stock } = req.query;
     
@@ -16,10 +17,10 @@ router.get('/', async (req, res) => {
       FROM inventory i
       JOIN trucks t ON i.truck_id = t.id
       JOIN companies c ON t.company_id = c.id
-      WHERE 1=1
+      WHERE c.id = $1
     `;
-    const params = [];
-    let paramCount = 0;
+    const params = [req.user.company_id];
+    let paramCount = 1;
 
     if (truck_id) {
       paramCount++;

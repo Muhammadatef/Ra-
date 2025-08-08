@@ -1,0 +1,89 @@
+|-- .claude
+    |-- settings.local.json
+|-- .gitignore
+|-- .operationl_system.txt.swp
+|-- PROJECT_SUMMARY.md
+|-- README.md
+|-- TECHNICAL_DOCUMENTATION.md
+|-- backend
+    |-- .env
+    |-- .gitignore
+    |-- Dockerfile
+    |-- backend.log
+    |-- config
+        |-- database.js
+    |-- middleware
+        |-- auth.js
+        |-- companyFilter.js
+    |-- package-lock.json
+    |-- package.json
+    |-- routes
+        |-- auth.js
+        |-- companies.js
+        |-- dashboard.js
+        |-- dataImport.js
+        |-- employees.js
+        |-- inventory.js
+        |-- routes.js
+        |-- sales.js
+        |-- truckSessions.js
+        |-- trucks.js
+    |-- scripts
+        |-- checkCurrentUsers.js
+        |-- checkUsers.js
+        |-- companyBasedSeed.js
+        |-- fixPassword.js
+        |-- healthCheck.js
+        |-- quickSeed.js
+        |-- recreateUsers.js
+        |-- seedData.js
+        |-- simpleServer.js
+        |-- testDB.js
+        |-- testLogin.js
+        |-- testLoginAPI.js
+        |-- testNewLogin.js
+    |-- server.js
+    |-- uploads
+    |-- workingServer.js
+|-- database
+    |-- init.sql
+|-- docker-compose.yml
+|-- erd_dimmodeling.txt
+|-- frontend
+    |-- .dockerignore
+    |-- .env
+    |-- .gitignore
+    |-- Dockerfile
+    |-- package.json
+    |-- public
+        |-- index.html
+    |-- src
+        |-- App.js
+        |-- components
+            |-- Navigation.js
+            |-- PrivateRoute.js
+            |-- RaLogo.js
+            |-- dashboard
+                |-- DashboardContainer.js
+                |-- DashboardWidget.js
+                |-- widgets
+                    |-- ChartWidget.js
+                    |-- KPIWidget.js
+        |-- contexts
+            |-- AuthContext.js
+            |-- FilterContext.js
+            |-- ThemeContext.js
+        |-- index.js
+        |-- pages
+            |-- Dashboard.js
+            |-- Employees.js
+            |-- Inventory.js
+            |-- Login.js
+            |-- Sales.js
+            |-- Trucks.js
+        |-- services
+            |-- api.js
+        |-- theme
+            |-- raTheme.js
+|-- run.sh
+|-- start.sh

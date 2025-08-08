@@ -116,6 +116,49 @@ CREATE INDEX idx_sales_truck_id ON sales(truck_id);
 CREATE INDEX idx_sales_date ON sales(sale_date);
 CREATE INDEX idx_inventory_truck_id ON inventory(truck_id);
 
+-- Users table for authentication
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'admin' CHECK (role IN ('admin', 'manager', 'employee')),
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Truck sessions for employee login/logout tracking
+CREATE TABLE truck_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    truck_id UUID REFERENCES trucks(id) ON DELETE CASCADE,
+    employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    logout_time TIMESTAMP,
+    session_status VARCHAR(20) DEFAULT 'active' CHECK (session_status IN ('active', 'completed')),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Enhanced sales table for detailed payment tracking
+ALTER TABLE sales ADD COLUMN tips_amount DECIMAL(8, 2) DEFAULT 0;
+ALTER TABLE sales ADD COLUMN card_amount DECIMAL(8, 2) DEFAULT 0;
+ALTER TABLE sales ADD COLUMN cash_amount DECIMAL(8, 2) DEFAULT 0;
+ALTER TABLE sales ADD COLUMN truck_session_id UUID REFERENCES truck_sessions(id) ON DELETE SET NULL;
+
+-- Create indexes for authentication and performance
+CREATE INDEX idx_users_company_id ON users(company_id);
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_truck_sessions_truck_id ON truck_sessions(truck_id);
+CREATE INDEX idx_truck_sessions_employee_id ON truck_sessions(employee_id);
+CREATE INDEX idx_truck_sessions_status ON truck_sessions(session_status);
+
 -- Create trigger for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -131,3 +174,4 @@ CREATE TRIGGER update_employees_updated_at BEFORE UPDATE ON employees FOR EACH R
 CREATE TRIGGER update_trucks_updated_at BEFORE UPDATE ON trucks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_routes_updated_at BEFORE UPDATE ON routes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_inventory_updated_at BEFORE UPDATE ON inventory FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

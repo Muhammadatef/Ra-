@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 
-// Get all sales
-router.get('/', async (req, res) => {
+// Get all sales (only for authenticated user's company)
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { truck_id, date_from, date_to, limit = 100, offset = 0 } = req.query;
+    const { truck_id, employee_id, date_from, date_to, limit = 100, offset = 0 } = req.query;
     
     let query = `
       SELECT s.*, 
@@ -20,15 +21,21 @@ router.get('/', async (req, res) => {
       JOIN companies c ON t.company_id = c.id
       LEFT JOIN employees e ON s.employee_id = e.id
       LEFT JOIN routes r ON s.route_id = r.id
-      WHERE 1=1
+      WHERE c.id = $1
     `;
-    const params = [];
-    let paramCount = 0;
+    const params = [req.user.company_id];
+    let paramCount = 1;
 
     if (truck_id) {
       paramCount++;
       query += ` AND s.truck_id = $${paramCount}`;
       params.push(truck_id);
+    }
+
+    if (employee_id) {
+      paramCount++;
+      query += ` AND s.employee_id = $${paramCount}`;
+      params.push(employee_id);
     }
 
     if (date_from) {
@@ -71,6 +78,12 @@ router.get('/', async (req, res) => {
       countParams.push(truck_id);
     }
 
+    if (employee_id) {
+      countParamCount++;
+      countQuery += ` AND s.employee_id = $${countParamCount}`;
+      countParams.push(employee_id);
+    }
+
     if (date_from) {
       countParamCount++;
       countQuery += ` AND s.sale_date >= $${countParamCount}`;
@@ -100,7 +113,7 @@ router.get('/', async (req, res) => {
 // Get sales summary
 router.get('/summary', async (req, res) => {
   try {
-    const { date_from, date_to, company_id } = req.query;
+    const { date_from, date_to, company_id, truck_id } = req.query;
     
     let query = `
       SELECT 
@@ -122,6 +135,12 @@ router.get('/summary', async (req, res) => {
       paramCount++;
       query += ` AND c.id = $${paramCount}`;
       params.push(company_id);
+    }
+
+    if (truck_id) {
+      paramCount++;
+      query += ` AND s.truck_id = $${paramCount}`;
+      params.push(truck_id);
     }
 
     if (date_from) {

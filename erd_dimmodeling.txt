@@ -1,0 +1,421 @@
+Based on the database schema, here's the Entity Relationship Diagram:
+
+  erDiagram
+      COMPANIES {
+          uuid id PK
+          varchar name
+          varchar business_type
+          varchar state
+          varchar contact_email
+          varchar contact_phone
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      LOCATIONS {
+          uuid id PK
+          uuid company_id FK
+          varchar name
+          text address
+          varchar city
+          varchar state
+          varchar zip_code
+          decimal latitude
+          decimal longitude
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      EMPLOYEES {
+          uuid id PK
+          uuid company_id FK
+          uuid location_id FK
+          varchar employee_id
+          varchar first_name
+          varchar last_name
+          varchar email
+          varchar phone
+          varchar position
+          date hire_date
+          decimal salary
+          varchar status
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      TRUCKS {
+          uuid id PK
+          uuid company_id FK
+          uuid location_id FK
+          varchar truck_number
+          varchar license_plate
+          varchar model
+          integer year
+          integer capacity
+          varchar status
+          date last_maintenance
+          date next_maintenance
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      ROUTES {
+          uuid id PK
+          uuid truck_id FK
+          uuid employee_id FK
+          varchar route_name
+          text start_location
+          text end_location
+          integer estimated_duration
+          date route_date
+          varchar status
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      SALES {
+          uuid id PK
+          uuid truck_id FK
+          uuid employee_id FK
+          uuid route_id FK
+          date sale_date
+          time sale_time
+          decimal total_amount
+          varchar payment_method
+          decimal location_lat
+          decimal location_lng
+          decimal tips_amount
+          decimal card_amount
+          decimal cash_amount
+          uuid truck_session_id FK
+          timestamp created_at
+      }
+
+      INVENTORY {
+          uuid id PK
+          uuid truck_id FK
+          varchar item_name
+          varchar category
+          integer quantity
+          decimal unit_price
+          integer reorder_level
+          date last_restocked
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      USERS {
+          uuid id PK
+          uuid company_id FK
+          varchar username
+          varchar email
+          varchar password_hash
+          varchar role
+          varchar first_name
+          varchar last_name
+          boolean is_active
+          timestamp last_login
+          timestamp created_at
+          timestamp updated_at
+      }
+
+      TRUCK_SESSIONS {
+          uuid id PK
+          uuid truck_id FK
+          uuid employee_id FK
+          uuid user_id FK
+          timestamp login_time
+          timestamp logout_time
+          varchar session_status
+          text notes
+          timestamp created_at
+      }
+
+      COMPANIES ||--o{ LOCATIONS : "has"
+      COMPANIES ||--o{ EMPLOYEES : "employs"
+      COMPANIES ||--o{ TRUCKS : "owns"
+      COMPANIES ||--o{ USERS : "has"
+
+      LOCATIONS ||--o{ EMPLOYEES : "stationed_at"
+      LOCATIONS ||--o{ TRUCKS : "based_at"
+
+      TRUCKS ||--o{ ROUTES : "assigned_to"
+      TRUCKS ||--o{ SALES : "generates"
+      TRUCKS ||--o{ INVENTORY : "carries"
+      TRUCKS ||--o{ TRUCK_SESSIONS : "operates"
+
+      EMPLOYEES ||--o{ ROUTES : "drives"
+      EMPLOYEES ||--o{ SALES : "handles"
+      EMPLOYEES ||--o{ TRUCK_SESSIONS : "logs_in"
+
+      USERS ||--o{ TRUCK_SESSIONS : "authenticates"
+
+      ROUTES ||--o{ SALES : "includes"
+
+      TRUCK_SESSIONS ||--o{ SALES : "records"
+
+  🏗️ RECOMMENDATION: Yes, Implement Dimensional Modeling!
+
+  You're absolutely right to consider implementing a dimensional modeling approach. Here's why and how:
+
+  🎯 Why Dimensional Modeling is Essential for Your Use Case:
+
+  1. Query Performance: Current operational queries are complex with many JOINs
+  2. Business Intelligence: Your dashboard needs fast aggregations
+  3. Historical Analysis: Time-based analysis is crucial for business insights
+  4. Scalability: As data grows, operational queries will slow down
+  5. User Experience: Faster dashboards = better user experience
+
+  📈 Proposed Dimensional Model Architecture
+
+  Fact Tables:
+
+  1. FACT_SALES (Primary Fact Table)
+
+  CREATE TABLE fact_sales (
+      sale_id UUID PRIMARY KEY,
+
+      -- Dimension Keys
+      date_key INTEGER NOT NULL,           -- FK to dim_date
+      time_key INTEGER NOT NULL,           -- FK to dim_time  
+      truck_key INTEGER NOT NULL,          -- FK to dim_truck
+      employee_key INTEGER NOT NULL,       -- FK to dim_employee
+      company_key INTEGER NOT NULL,        -- FK to dim_company
+      location_key INTEGER NOT NULL,       -- FK to dim_location
+      route_key INTEGER NOT NULL,          -- FK to dim_route
+
+      -- Measures
+      total_amount DECIMAL(10,2),
+      tips_amount DECIMAL(8,2),
+      card_amount DECIMAL(8,2),
+      cash_amount DECIMAL(8,2),
+
+      -- Degenerate Dimensions
+      payment_method VARCHAR(20),
+      session_id UUID,
+
+      -- Additive Measures for Aggregation
+      transaction_count INTEGER DEFAULT 1,
+
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+
+  2. FACT_INVENTORY_SNAPSHOT (Periodic Snapshot)
+
+  CREATE TABLE fact_inventory_snapshot (
+      snapshot_id UUID PRIMARY KEY,
+
+      -- Dimension Keys
+      date_key INTEGER NOT NULL,
+      truck_key INTEGER NOT NULL,
+      product_key INTEGER NOT NULL,
+      company_key INTEGER NOT NULL,
+
+      -- Measures
+      quantity_on_hand INTEGER,
+      unit_price DECIMAL(8,2),
+      total_value DECIMAL(10,2),
+      reorder_level INTEGER,
+      days_since_restock INTEGER,
+
+      -- Flags
+      is_low_stock BOOLEAN,
+      is_out_of_stock BOOLEAN,
+
+      snapshot_date DATE NOT NULL
+  );
+
+  Dimension Tables:
+
+  1. DIM_DATE (Critical for Time Intelligence)
+
+  CREATE TABLE dim_date (
+      date_key INTEGER PRIMARY KEY,         -- YYYYMMDD format
+      date_value DATE NOT NULL,
+      day_of_week INTEGER,
+      day_name VARCHAR(10),
+      day_of_month INTEGER,
+      day_of_year INTEGER,
+      week_of_year INTEGER,
+      month_number INTEGER,
+      month_name VARCHAR(10),
+      quarter INTEGER,
+      year INTEGER,
+      is_weekend BOOLEAN,
+      is_holiday BOOLEAN,
+      fiscal_year INTEGER,
+      fiscal_quarter INTEGER,
+      season VARCHAR(10)
+  );
+
+  2. DIM_TIME
+
+  CREATE TABLE dim_time (
+      time_key INTEGER PRIMARY KEY,         -- HHMMSS format
+      time_value TIME NOT NULL,
+      hour24 INTEGER,
+      hour12 INTEGER,
+      minute INTEGER,
+      second INTEGER,
+      am_pm VARCHAR(2),
+      time_period VARCHAR(20),              -- Morning, Afternoon, Evening, Night
+      business_hour BOOLEAN
+  );
+
+  3. DIM_TRUCK (Slowly Changing Dimension Type 2)
+
+  CREATE TABLE dim_truck (
+      truck_key INTEGER PRIMARY KEY,        -- Surrogate Key
+      truck_id UUID NOT NULL,              -- Natural Key
+      truck_number VARCHAR(50) NOT NULL,
+      license_plate VARCHAR(20),
+      model VARCHAR(100),
+      year INTEGER,
+      capacity INTEGER,
+      status VARCHAR(20),
+
+      -- SCD Type 2 fields
+      effective_date DATE NOT NULL,
+      expiration_date DATE,
+      is_current BOOLEAN DEFAULT TRUE,
+
+      -- Denormalized company info for performance
+      company_id UUID,
+      company_name VARCHAR(255),
+      business_type VARCHAR(50),
+      company_state VARCHAR(50)
+  );
+
+  4. DIM_EMPLOYEE (SCD Type 2)
+
+  CREATE TABLE dim_employee (
+      employee_key INTEGER PRIMARY KEY,
+      employee_id VARCHAR(50) NOT NULL,
+      employee_uuid UUID NOT NULL,
+      first_name VARCHAR(100),
+      last_name VARCHAR(100),
+      full_name VARCHAR(200),
+      email VARCHAR(255),
+      position VARCHAR(100),
+      hire_date DATE,
+      salary DECIMAL(10,2),
+      status VARCHAR(20),
+
+      -- SCD Type 2
+      effective_date DATE NOT NULL,
+      expiration_date DATE,
+      is_current BOOLEAN DEFAULT TRUE,
+
+      -- Denormalized
+      company_id UUID,
+      company_name VARCHAR(255),
+      location_name VARCHAR(255)
+  );
+
+  5. DIM_COMPANY (SCD Type 1)
+
+  CREATE TABLE dim_company (
+      company_key INTEGER PRIMARY KEY,
+      company_id UUID NOT NULL,
+      company_name VARCHAR(255),
+      business_type VARCHAR(50),
+      state VARCHAR(50),
+      contact_email VARCHAR(255),
+      contact_phone VARCHAR(20),
+      total_employees INTEGER,
+      total_trucks INTEGER,
+      created_date DATE
+  );
+
+  🔄 ETL Pipeline Architecture
+
+  1. Data Flow:
+
+  Operational DB → Staging Area → Data Warehouse → Dashboard APIs
+       (OLTP)         (ETL)         (OLAP)           (Serving Layer)
+
+  2. ETL Process:
+
+  -- Daily ETL Job Example
+  -- 1. Extract (from operational DB)
+  CREATE TEMP TABLE staging_sales AS
+  SELECT * FROM sales WHERE sale_date = CURRENT_DATE - 1;
+
+  -- 2. Transform & Load
+  INSERT INTO fact_sales (
+      date_key, time_key, truck_key, employee_key,
+      company_key, total_amount, tips_amount, payment_method
+  )
+  SELECT
+      TO_NUMBER(TO_CHAR(s.sale_date, 'YYYYMMDD'), '99999999') as date_key,
+      TO_NUMBER(TO_CHAR(s.sale_time, 'HH24MISS'), '999999') as time_key,
+      dt.truck_key,
+      de.employee_key,
+      dc.company_key,
+      s.total_amount,
+      s.tips_amount,
+      s.payment_method
+  FROM staging_sales s
+  JOIN dim_truck dt ON s.truck_id = dt.truck_id AND dt.is_current = true
+  JOIN dim_employee de ON s.employee_id = de.employee_uuid AND de.is_current = true
+  JOIN dim_company dc ON dt.company_id = dc.company_id;
+
+  🚀 Implementation Roadmap
+
+  Phase 1: Foundation (Week 1-2)
+
+  1. Create dimensional schema
+  2. Populate date and time dimensions
+  3. Create initial dimension tables
+
+  Phase 2: ETL Development (Week 3-4)
+
+  1. Build ETL processes for daily sales data
+  2. Implement SCD Type 2 for trucks/employees
+  3. Create inventory snapshot process
+
+  Phase 3: API Optimization (Week 5)
+
+  1. Create new dashboard APIs that query dimensional model
+  2. Implement aggregation tables for common queries
+  3. Add caching layer
+
+  Phase 4: Dashboard Migration (Week 6)
+
+  1. Update frontend to use new APIs
+  2. Add new KPIs enabled by dimensional model
+  3. Performance testing
+
+  📊 Benefits You'll Gain:
+
+  1. Query Performance: 10-100x faster dashboard queries
+  2. Historical Trending: Easy time-over-time comparisons
+  3. Complex Analytics: Multi-dimensional analysis
+  4. Scalability: Handle years of data efficiently
+  5. Business Intelligence: Enable advanced reporting
+
+  🎯 Key Performance Improvements:
+
+  Before (Operational):
+  -- Complex query with multiple JOINs
+  SELECT c.name, SUM(s.total_amount)
+  FROM sales s
+  JOIN trucks t ON s.truck_id = t.id
+  JOIN companies c ON t.company_id = c.id
+  WHERE s.sale_date BETWEEN '2024-01-01' AND '2024-12-31'
+  GROUP BY c.name;
+  -- Execution time: ~2-5 seconds
+
+  After (Dimensional):
+  -- Simple, fast query
+  SELECT dc.company_name, SUM(fs.total_amount)
+  FROM fact_sales fs
+  JOIN dim_company dc ON fs.company_key = dc.company_key
+  JOIN dim_date dd ON fs.date_key = dd.date_key
+  WHERE dd.year = 2024
+  GROUP BY dc.company_name;
+  -- Execution time: ~50-200ms
+
+  Recommendation: Start with Phase 1 while keeping the operational system running in parallel. This gives you the best of both worlds during transition.
+
+  Would you like me to help you implement any specific part of this dimensional model?

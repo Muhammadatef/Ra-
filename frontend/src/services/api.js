@@ -10,9 +10,13 @@ const api = axios.create({
   },
 });
 
-// Request interceptor
+// Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
+    const token = localStorage.getItem('ra_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => {
@@ -20,12 +24,17 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor
+// Response interceptor to handle auth errors
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid, clear it
+      localStorage.removeItem('ra_token');
+      window.location.href = '/login';
+    }
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
@@ -33,11 +42,26 @@ api.interceptors.response.use(
 
 // API endpoints
 export const apiEndpoints = {
+  // Authentication
+  login: (data) => api.post('/auth/login', data),
+  register: (data) => api.post('/auth/register', data),
+  logout: () => api.post('/auth/logout'),
+  getProfile: () => api.get('/auth/profile'),
+  changePassword: (data) => api.put('/auth/password', data),
+
   // Dashboard
   getDashboardOverview: (params = {}) => api.get('/dashboard/overview', { params }),
   getSalesAnalytics: (params = {}) => api.get('/dashboard/sales-analytics', { params }),
   getTruckPerformance: (params = {}) => api.get('/dashboard/truck-performance', { params }),
+  getEmployeePerformance: (params = {}) => api.get('/dashboard/employee-performance', { params }),
   getLowStock: (params = {}) => api.get('/dashboard/low-stock', { params }),
+
+  // Truck Sessions
+  startTruckSession: (data) => api.post('/truck-sessions/start', data),
+  endTruckSession: (sessionId, data) => api.put(`/truck-sessions/${sessionId}/end`, data),
+  getActiveSessions: () => api.get('/truck-sessions/active'),
+  getSessionHistory: (params = {}) => api.get('/truck-sessions/history', { params }),
+  getSessionAnalytics: (params = {}) => api.get('/truck-sessions/analytics', { params }),
 
   // Companies
   getCompanies: () => api.get('/companies'),

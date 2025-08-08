@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -22,32 +22,15 @@ import { apiEndpoints } from '../services/api';
 
 function Trucks() {
   const [trucks, setTrucks] = useState([]);
-  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedCompany, setSelectedCompany] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
 
-  useEffect(() => {
-    fetchTrucks();
-    fetchCompanies();
-  }, [selectedCompany, selectedStatus]);
-
-  const fetchCompanies = async () => {
-    try {
-      const response = await apiEndpoints.getCompanies();
-      setCompanies(response.data);
-    } catch (err) {
-      console.error('Error fetching companies:', err);
-    }
-  };
-
-  const fetchTrucks = async () => {
+  const fetchTrucks = useCallback(async () => {
     try {
       setLoading(true);
       const params = {};
       
-      if (selectedCompany) params.company_id = selectedCompany;
       if (selectedStatus) params.status = selectedStatus;
 
       const response = await apiEndpoints.getTrucks(params);
@@ -59,7 +42,11 @@ function Trucks() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStatus]);
+
+  useEffect(() => {
+    fetchTrucks();
+  }, [fetchTrucks]);
 
   if (loading) {
     return (
@@ -81,23 +68,6 @@ function Trucks() {
 
       {/* Filters */}
       <Grid container spacing={2} mb={3}>
-        <Grid item xs={12} sm={6} md={3}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Company</InputLabel>
-            <Select
-              value={selectedCompany}
-              label="Company"
-              onChange={(e) => setSelectedCompany(e.target.value)}
-            >
-              <MenuItem value="">All Companies</MenuItem>
-              {companies.map((company) => (
-                <MenuItem key={company.id} value={company.id}>
-                  {company.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
         <Grid item xs={12} sm={6} md={3}>
           <FormControl fullWidth size="small">
             <InputLabel>Status</InputLabel>
@@ -124,7 +94,6 @@ function Trucks() {
                 <TableCell>License Plate</TableCell>
                 <TableCell>Model</TableCell>
                 <TableCell>Year</TableCell>
-                <TableCell>Company</TableCell>
                 <TableCell>Location</TableCell>
                 <TableCell>Capacity</TableCell>
                 <TableCell>Last Maintenance</TableCell>
@@ -143,18 +112,6 @@ function Trucks() {
                   <TableCell>{truck.license_plate}</TableCell>
                   <TableCell>{truck.model}</TableCell>
                   <TableCell>{truck.year}</TableCell>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="body2">
-                        {truck.company_name}
-                      </Typography>
-                      <Chip
-                        label={truck.business_type?.replace('_', ' ')}
-                        size="small"
-                        color={truck.business_type === 'ice_cream' ? 'primary' : 'secondary'}
-                      />
-                    </Box>
-                  </TableCell>
                   <TableCell>
                     {truck.location_name ? (
                       <Typography variant="body2">

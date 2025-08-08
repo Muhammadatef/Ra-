@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 
-// Get all trucks
-router.get('/', async (req, res) => {
+// Get all trucks (only for authenticated user's company)
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { company_id, status } = req.query;
+    const { status } = req.query;
     
     let query = `
       SELECT t.*, 
@@ -17,16 +18,10 @@ router.get('/', async (req, res) => {
       FROM trucks t
       JOIN companies c ON t.company_id = c.id
       LEFT JOIN locations l ON t.location_id = l.id
-      WHERE 1=1
+      WHERE t.company_id = $1
     `;
-    const params = [];
-    let paramCount = 0;
-
-    if (company_id) {
-      paramCount++;
-      query += ` AND t.company_id = $${paramCount}`;
-      params.push(company_id);
-    }
+    const params = [req.user.company_id];
+    let paramCount = 1;
 
     if (status) {
       paramCount++;
@@ -44,8 +39,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get truck by ID
-router.get('/:id', async (req, res) => {
+// Get truck by ID (only for authenticated user's company)
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query(`
@@ -58,8 +53,8 @@ router.get('/:id', async (req, res) => {
       FROM trucks t
       JOIN companies c ON t.company_id = c.id
       LEFT JOIN locations l ON t.location_id = l.id
-      WHERE t.id = $1
-    `, [id]);
+      WHERE t.id = $1 AND t.company_id = $2
+    `, [id, req.user.company_id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Truck not found' });
@@ -72,13 +67,16 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new truck
-router.post('/', async (req, res) => {
+// Create new truck (for authenticated user's company)
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
-      company_id, location_id, truck_number, license_plate,
+      location_id, truck_number, license_plate,
       model, year, capacity, status = 'active', last_maintenance, next_maintenance
     } = req.body;
+    
+    // Always use the authenticated user's company
+    const company_id = req.user.company_id;
     
     const result = await pool.query(`
       INSERT INTO trucks (
@@ -101,8 +99,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update truck
-router.put('/:id', async (req, res) => {
+// Update truck (only for authenticated user's company)
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -115,10 +113,10 @@ router.put('/:id', async (req, res) => {
       SET location_id = $1, model = $2, year = $3, capacity = $4,
           status = $5, last_maintenance = $6, next_maintenance = $7,
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8
+      WHERE id = $8 AND company_id = $9
       RETURNING *
     `, [location_id, model, year, capacity, status,
-        last_maintenance, next_maintenance, id]);
+        last_maintenance, next_maintenance, id, req.user.company_id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Truck not found' });
@@ -131,12 +129,12 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete truck
-router.delete('/:id', async (req, res) => {
+// Delete truck (only for authenticated user's company)
+router.delete('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const result = await pool.query('DELETE FROM trucks WHERE id = $1 RETURNING *', [id]);
+    const result = await pool.query('DELETE FROM trucks WHERE id = $1 AND company_id = $2 RETURNING *', [id, req.user.company_id]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Truck not found' });

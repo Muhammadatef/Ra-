@@ -1,13 +1,14 @@
 const pool = require('../config/database');
 const { faker } = require('@faker-js/faker');
+const bcrypt = require('bcryptjs');
 
 // Quick seed with less data for faster startup
 async function quickSeed() {
   try {
     console.log('🌱 Quick seeding Ra Platform...');
     
-    // Clear existing data
-    await pool.query('TRUNCATE TABLE sales, inventory, routes, trucks, employees, locations, companies CASCADE');
+    // Clear existing data (includes users table)
+    await pool.query('TRUNCATE TABLE truck_sessions, sales, inventory, routes, trucks, employees, locations, users, companies CASCADE');
     
     // Create 2 ice cream companies in Washington
     const iceCompany1 = await pool.query(`
@@ -43,6 +44,34 @@ async function quickSeed() {
     ];
     
     console.log('🏢 Created 4 companies');
+    
+    // Create admin users for each company
+    const users = [];
+    const adminCredentials = [
+      { username: 'arctic_admin', email: 'admin@arcticdelights.com', firstName: 'John', lastName: 'Arctic' },
+      { username: 'frozen_admin', email: 'admin@frozenparadise.com', firstName: 'Jane', lastName: 'Paradise' },
+      { username: 'golden_admin', email: 'admin@goldenburger.com', firstName: 'Mike', lastName: 'Golden' },
+      { username: 'pacific_admin', email: 'admin@pacificgrill.com', firstName: 'Sarah', lastName: 'Pacific' }
+    ];
+    
+    for (let i = 0; i < companies.length; i++) {
+      const creds = adminCredentials[i];
+      const passwordHash = await bcrypt.hash('password123', 12);
+      
+      const user = await pool.query(`
+        INSERT INTO users (company_id, username, email, password_hash, first_name, last_name, role)
+        VALUES ($1, $2, $3, $4, $5, $6, 'admin')
+        RETURNING *
+      `, [companies[i].id, creds.username, creds.email, passwordHash, creds.firstName, creds.lastName]);
+      
+      users.push(user.rows[0]);
+    }
+    
+    console.log('👤 Created admin users for each company');
+    console.log('📝 Login credentials:');
+    adminCredentials.forEach((creds, i) => {
+      console.log(`   ${companies[i].name}: ${creds.username} / password123`);
+    });
     
     // Create locations
     const locations = [];
@@ -219,19 +248,33 @@ async function quickSeed() {
           faker.number.float({ min: 3.00, max: 15.00, fractionDigits: 2 }) :
           faker.number.float({ min: 8.99, max: 25.00, fractionDigits: 2 });
         
+        // Calculate payment breakdown
+        const paymentMethod = faker.helpers.arrayElement(['cash', 'card', 'mobile']);
+        const tipsAmount = faker.datatype.boolean(0.7) ? faker.number.float({ min: 1, max: 8 }) : 0;
+        let cashAmount = 0, cardAmount = 0;
+        
+        if (paymentMethod === 'cash') {
+          cashAmount = baseAmount;
+        } else {
+          cardAmount = baseAmount;
+        }
+
         await pool.query(`
           INSERT INTO sales (
             truck_id, employee_id, sale_date, sale_time,
-            total_amount, payment_method, location_lat, location_lng
+            total_amount, tips_amount, cash_amount, card_amount, payment_method, location_lat, location_lng
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         `, [
           truck.id,
           employee.id,
           saleDate.toISOString().split('T')[0],
           saleDate.toTimeString().split(' ')[0].substring(0, 8),
           baseAmount,
-          faker.helpers.arrayElement(['cash', 'card', 'mobile']),
+          tipsAmount,
+          cashAmount,
+          cardAmount,
+          paymentMethod,
           company.state === 'Washington' ? 
             faker.location.latitude({ min: 45.5, max: 49.0 }) : 
             faker.location.latitude({ min: 32.5, max: 42.0 }),

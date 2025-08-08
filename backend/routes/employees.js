@@ -1,11 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const { addCompanyFilter } = require('../middleware/companyFilter');
 
-// Get all employees with company and location info
+// Apply authentication and company filtering to all routes
+router.use(authenticateToken);
+router.use(addCompanyFilter);
+
+// Get all employees with company and location info (filtered by user's company)
 router.get('/', async (req, res) => {
   try {
-    const { company_id, status, limit = 50, offset = 0 } = req.query;
+    const { status, limit = 50, offset = 0 } = req.query;
+    const companyId = req.user.company_id; // Use authenticated user's company
     
     let query = `
       SELECT e.*, 
@@ -19,14 +26,11 @@ router.get('/', async (req, res) => {
       LEFT JOIN locations l ON e.location_id = l.id
       WHERE 1=1
     `;
-    const params = [];
-    let paramCount = 0;
-
-    if (company_id) {
-      paramCount++;
-      query += ` AND e.company_id = $${paramCount}`;
-      params.push(company_id);
-    }
+    const params = [companyId]; // Always filter by user's company
+    let paramCount = 1;
+    
+    // Company filter is always applied
+    query += ` AND e.company_id = $${paramCount}`;
 
     if (status) {
       paramCount++;
@@ -51,16 +55,10 @@ router.get('/', async (req, res) => {
       SELECT COUNT(*) 
       FROM employees e
       JOIN companies c ON e.company_id = c.id
-      WHERE 1=1
+      WHERE e.company_id = $1
     `;
-    const countParams = [];
-    let countParamCount = 0;
-
-    if (company_id) {
-      countParamCount++;
-      countQuery += ` AND e.company_id = $${countParamCount}`;
-      countParams.push(company_id);
-    }
+    const countParams = [companyId];
+    let countParamCount = 1;
 
     if (status) {
       countParamCount++;
